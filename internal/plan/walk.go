@@ -94,15 +94,16 @@ func Walk(opts WalkOptions) ([]Job, error) {
 }
 
 // dstRel replaces the extension when the output format differs from input.
-// HEIC always becomes JPEG and video files always become MP4 in the output
-// tree, so downstream consumers can round-trip via Google Photos safely.
+// HEIC/HEIF extensions always become .jpg — either because we transcoded HEIC
+// to JPEG, or because the file was misnamed HEIC-with-JPEG-content that we
+// re-routed to the JPEG path. Video files always become .mp4.
 func dstRel(rel string, kind Kind) string {
-	switch kind {
-	case KindHEIC:
-		ext := filepath.Ext(rel)
+	ext := filepath.Ext(rel)
+	switch strings.ToLower(ext) {
+	case ".heic", ".heif":
 		return strings.TrimSuffix(rel, ext) + ".jpg"
-	case KindVideo:
-		ext := filepath.Ext(rel)
+	}
+	if kind == KindVideo {
 		if strings.EqualFold(ext, ".mp4") {
 			return rel
 		}

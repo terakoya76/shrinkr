@@ -36,9 +36,18 @@ func (k Kind) String() string {
 	}
 }
 
-// Classify determines media kind from file extension first, then falls back
-// to magic byte sniffing for extensionless or ambiguous files.
+// Classify determines media kind by inspecting the file's magic bytes.
+// Content is authoritative — misnamed files (.HEIC that is actually JPEG,
+// .MP4 that is actually MOV, ...) would otherwise blow up downstream
+// handlers that trust the extension (heif-convert refuses JPEG-in-HEIC,
+// exiftool refuses format mismatches, etc.). Extension is used only as
+// a fallback for formats sniff() does not recognize.
 func Classify(path string) (Kind, error) {
+	if k, err := sniff(path); err != nil {
+		return KindUnknown, err
+	} else if k != KindUnknown {
+		return k, nil
+	}
 	switch ext := strings.ToLower(extOf(path)); ext {
 	case ".jpg", ".jpeg":
 		return KindJPEG, nil
@@ -51,7 +60,7 @@ func Classify(path string) (Kind, error) {
 	case ".mp4", ".mov", ".mkv", ".avi", ".3gp", ".m4v", ".webm":
 		return KindVideo, nil
 	}
-	return sniff(path)
+	return KindUnknown, nil
 }
 
 func extOf(path string) string {
