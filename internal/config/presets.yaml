@@ -1,0 +1,22 @@
+presets:
+  aggressive:
+    image_max_edge: 2560
+    jpeg_quality: 75
+    webp_quality: 72
+    video_max_height: 720
+    video_crf: 30
+    min_savings: 0.05
+  balanced:
+    image_max_edge: 4096
+    jpeg_quality: 82
+    webp_quality: 80
+    video_max_height: 1080
+    video_crf: 26
+    min_savings: 0.10
+  conservative:
+    image_max_edge: 6000
+    jpeg_quality: 88
+    webp_quality: 85
+    video_max_height: 1440
+    video_crf: 22
+    min_savings: 0.15
