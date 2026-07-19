@@ -44,20 +44,33 @@ func Probe(ctx context.Context, r runner.Runner, path string) (Info, error) {
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return Info{}, fmt.Errorf("parse ffprobe json: %w", err)
 	}
+	// Only the first video and first audio stream matter. A DJI drone MP4, for
+	// example, has both an HEVC main stream and an MJPEG thumbnail marked as
+	// `codec_type=video`; taking the last one would misidentify the file as
+	// mjpeg and silently disable the HEVC-preserving encode path.
 	var info Info
+	var haveVideo, haveAudio bool
 	for _, s := range raw.Streams {
 		switch s.CodecType {
 		case "video":
+			if haveVideo {
+				continue
+			}
 			info.Width = s.Width
 			info.Height = s.Height
 			info.VideoCodec = s.CodecName
+			haveVideo = true
 		case "audio":
+			if haveAudio {
+				continue
+			}
 			info.AudioCodec = s.CodecName
 			if s.BitRateStr != "" {
 				if v, err := strconv.Atoi(s.BitRateStr); err == nil {
 					info.AudioBitsPS = v
 				}
 			}
+			haveAudio = true
 		}
 	}
 	return info, nil

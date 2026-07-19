@@ -87,7 +87,7 @@ shrinkr run <src> <dst>   # Compress.
 | `--video-max-height`                | preset     | Height cap for videos.                                                                         |
 | `--jpeg-quality`                    | preset     | Around 82.                                                                                     |
 | `--webp-quality`                    | preset     | Around 80.                                                                                     |
-| `--video-crf`                       | preset     | H.264 CRF (lower = higher quality).                                                            |
+| `--video-crf`                       | preset     | H.264 CRF (lower = higher quality). HEVC sources add +5 internally to keep visual quality parity. |
 | `--report <path>`                   | -          | Write a JSON summary to this path.                                                             |
 | `--overwrite`                       | off        | Overwrite outputs even if they look current (default: skip via mtime check).                   |
 | `--include-glob` / `--exclude-glob` | -          | Filename filters.                                                                              |
@@ -103,7 +103,7 @@ shrinkr run <src> <dst>   # Compress.
 ## Behavior details
 
 - **Input formats**: `.jpg` / `.png` / `.heic` / `.heif` / `.webp` / `.mp4` / `.mov` / `.mkv` / `.avi` / `.3gp` / `.m4v` / `.webm`. Everything else is ignored (Takeout sidecar `.json` files are also skipped automatically).
-- **Output formats**: HEIC becomes JPEG and every video becomes MP4 (H.264 + AAC). Google Photos places JPEG and MP4 on the timeline correctly.
+- **Output formats**: HEIC becomes JPEG. Video containers are always MP4 (AAC audio). Video codec matches the source — HEVC (H.265) input is re-encoded with libx265 (kept HEVC, hvc1-tagged), and everything else with libx264. Transcoding an already-HEVC source to H.264 at the same CRF often makes the file larger, which auto-preservation avoids.
 - **Metadata preservation**: EXIF (`DateTimeOriginal`, GPS, orientation, ...) is copied to the destination with `exiftool -TagsFromFile`. Video container metadata (`creation_time`, ...) is preserved via `ffmpeg -map_metadata 0`. File mtime is aligned to the source.
 - **Idempotent**: If the destination already exists and is not older than the source, the job is skipped. Use `--overwrite` to force.
 - **min-savings**: If the compressed output is larger than `(1 - min-savings) * source_size`, shrinkr writes the original bytes instead. Avoids re-encoding when the result would not actually save space.
