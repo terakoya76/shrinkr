@@ -1,29 +1,8 @@
 # shrinkr
 
-A CLI that re-compresses photos and videos exported from Google Photos via Takeout. Meant as the middle step of a pipeline that archives originals to S3 / Backblaze B2, then re-uploads compressed versions to Google Photos to reclaim quota.
+A CLI that batch-compresses a mixed directory of photos and videos into a mirrored output tree. Point it at a folder full of `.jpg` / `.heic` / `.mp4` / etc., pick a preset, and it produces smaller copies with EXIF and container metadata preserved.
 
 Ships as a single Go binary plus a couple of external CLIs (`ffmpeg`, `exiftool`, ...).
-
-## Pipeline
-
-```bash
-# 1. Export the album via Google Takeout as a tgz.
-#    The Google Photos Library API scope change (2025-03) removed third-party
-#    read access to the user's library, so downloads have to be done by hand.
-
-tar xzf ~/Downloads/takeout-YYYYMMDD.tgz -C ~/photos-raw
-
-# 2. Archive the originals to Backblaze B2 (rclone remote must be pre-configured).
-rclone copy ~/photos-raw b2:my-photos-archive --transfers 8
-
-# 3. Compress.
-shrinkr run ~/photos-raw ~/photos-slim --preset balanced --report ~/photos-slim/report.json
-
-# 4. Delete the original album from Google Photos in the web UI.
-
-# 5. Re-upload the compressed copies.
-gphotos-uploader-cli push ~/photos-slim
-```
 
 ## Install
 
@@ -100,9 +79,37 @@ shrinkr run <src> <dst>   # Compress.
 | balanced     | 4096     | 82     | 80     | 1080  | 26      | 0.10     |
 | conservative | 6000     | 88     | 85     | 1440  | 22      | 0.15     |
 
+## Example: reclaim Google Photos storage
+
+The workflow shrinkr was originally built for. Archive the originals to
+object storage, then replace the Google Photos copies with smaller
+transcodes so the quota goes back down without losing the ability to
+retrieve full-quality versions.
+
+Downloads are manual — the Google Photos Library API scope change
+(2025-03) removed third-party read access to the user's own library.
+
+```bash
+# 1. Export the album via Google Takeout, then unpack it.
+tar xzf ~/Downloads/takeout-YYYYMMDD.tgz -C ~/photos-raw
+
+# 2. Archive the originals to S3 (any rclone remote works —
+#    Backblaze B2, R2, ... — just change the remote name).
+rclone copy ~/photos-raw s3:my-photos-archive --transfers 8
+
+# 3. Compress.
+shrinkr run ~/photos-raw ~/photos-slim --preset balanced --report ~/photos-slim/report.json
+
+# 4. Delete the original album from Google Photos in the web UI.
+
+# 5. Re-upload the compressed copies.
+gphotos-uploader-cli push ~/photos-slim
+```
+
 ## Behavior details
 
-- **Input formats**: `.jpg` / `.png` / `.heic` / `.heif` / `.webp` / `.mp4` / `.mov` / `.mkv` / `.avi` / `.3gp` / `.m4v` / `.webm`. Everything else is ignored (Takeout sidecar `.json` files are also skipped automatically).
+- **Input formats**: `.jpg` / `.png` / `.heic` / `.heif` / `.webp` / `.mp4` / `.mov` / `.mkv` / `.avi` / `.3gp` / `.m4v` / `.webm`. Everything else is ignored, along with any `.json` files (photo-export tools frequently ship sidecar JSON metadata).
+- **Content over extension**: files are classified by magic bytes, not by their extension, so a `.HEIC` file that actually holds JPEG bytes (a common export/rename quirk) is routed to the JPEG path instead of blowing up `heif-convert`.
 - **Output formats**: HEIC becomes JPEG. Video containers are always MP4 (AAC audio). Video codec matches the source — HEVC (H.265) input is re-encoded with libx265 (kept HEVC, hvc1-tagged), and everything else with libx264. Transcoding an already-HEVC source to H.264 at the same CRF often makes the file larger, which auto-preservation avoids.
 - **Metadata preservation**: EXIF (`DateTimeOriginal`, GPS, orientation, ...) is copied to the destination with `exiftool -TagsFromFile`. Video container metadata (`creation_time`, ...) is preserved via `ffmpeg -map_metadata 0`. File mtime is aligned to the source.
 - **Idempotent**: If the destination already exists and is not older than the source, the job is skipped. Use `--overwrite` to force.
