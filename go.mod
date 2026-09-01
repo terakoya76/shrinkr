@@ -3,7 +3,7 @@ module github.com/terakoya76/shrinkr
 go 1.26.4
 
 require (
-	github.com/alecthomas/kong v1.16.0
+	github.com/alecthomas/kong v1.16.1
 	github.com/schollz/progressbar/v3 v3.19.1
 	golang.org/x/image v0.44.0
 	gopkg.in/yaml.v3 v3.0.1
